@@ -1,0 +1,110 @@
+# ============================================================================
+# STICKY NOTE / README
+# Owned By     : <isi nama/tim kamu>
+# Last Updated : 2026-09-26
+# Description  : Render 1 video affiliate produk per trigger dari n8n
+#                (judul, harga, gambar, naskah voiceover), lalu kirim
+#                hasil videonya ke Telegram.
+# Flow         : Trigger (n8n via API) -> BuildRenderProps ->
+#                GenerateVoiceover -> RenderRemotionVideo ->
+#                SendVideoToTelegram -> (kalau gagal) ErrorHandlerGlobal
+# Dependencies : Secrets TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
+#                (Settings -> Secrets and variables -> Actions)
+# ============================================================================
+name: AFF-01 - RenderAffiliateVideo [Production]
+
+on:
+  repository_dispatch:
+    types: [render_video]
+  workflow_dispatch:
+    inputs:
+      product_title:
+        description: "Judul produk"
+        required: true
+      product_price:
+        description: "Harga produk (contoh: Rp 149.000)"
+        required: true
+      product_image_url:
+        description: "URL gambar produk"
+        required: true
+      script_text:
+        description: "Naskah voiceover / storyboard"
+        required: true
+
+env:
+  PRODUCT_TITLE: ${{ github.event.client_payload.product_title || github.event.inputs.product_title }}
+  PRODUCT_PRICE: ${{ github.event.client_payload.product_price || github.event.inputs.product_price }}
+  PRODUCT_IMAGE_URL: ${{ github.event.client_payload.product_image_url || github.event.inputs.product_image_url }}
+  SCRIPT_TEXT: ${{ github.event.client_payload.script_text || github.event.inputs.script_text }}
+
+jobs:
+  RenderVideo:
+    name: RenderVideo
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: remotion
+    steps:
+      - name: CheckoutRepo
+        uses: actions/checkout@v4
+
+      - name: SetupNode
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: remotion/package-lock.json
+
+      - name: InstallDependencies
+        run: npm ci
+
+      - name: BuildRenderProps
+        run: npm run build-props
+
+      # Retry 3x / jeda 1000ms untuk step yang panggil API eksternal (SOP butir 3)
+      - name: GenerateVoiceover
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 5
+          retry_wait_seconds: 1
+          command: cd remotion && npm run generate-voiceover
+
+      - name: RenderRemotionVideo
+        run: npx remotion render src/index.ts AffiliateVideo out/video.mp4 --props=props.json
+
+      # Data/metadata dicatat dulu sebelum notifikasi dikirim (SOP: order of operations)
+      - name: LogRenderMetadata
+        run: |
+          echo "### Render selesai" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Produk: ${PRODUCT_TITLE}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Harga : ${PRODUCT_PRICE}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: SendVideoToTelegram
+        uses: nick-fields/retry@v3
+        with:
+          max_attempts: 3
+          timeout_minutes: 5
+          retry_wait_seconds: 1
+          command: cd remotion && npm run send-telegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          PRODUCT_TITLE: ${{ env.PRODUCT_TITLE }}
+
+  # Global Error Handler (SOP butir 3): jalan kalau job RenderVideo gagal di step manapun
+  ErrorHandlerGlobal:
+    name: ErrorHandlerGlobal
+    needs: RenderVideo
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - name: NotifyFailureToTelegram
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d text="Render video affiliate GAGAL. Cek log GitHub Actions untuk detail."
