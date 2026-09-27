@@ -3,7 +3,6 @@ import path from "node:path";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 
 const scriptText = process.env.SCRIPT_TEXT;
-// Suara Bahasa Indonesia bawaan Edge TTS. Ganti via env TTS_VOICE kalau mau coba suara lain.
 const voice = process.env.TTS_VOICE || "id-ID-ArdiNeural";
 
 if (!scriptText) {
@@ -17,11 +16,11 @@ fs.mkdirSync(publicDir, { recursive: true });
 const tts = new MsEdgeTTS();
 await tts.setMetadata(voice, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
 
-const outputPath = path.join(publicDir, "voiceover.mp3");
-const { audioFilePath } = await tts.toFile(outputPath, scriptText);
+// toFile menerima path FOLDER, lalu mengembalikan path file yang dia buat sendiri
+const { audioFilePath } = await tts.toFile(publicDir, scriptText);
 
-console.log(`Voiceover tersimpan di: ${audioFilePath}`);
+// Rename hasilnya jadi voiceover.mp3 biar konsisten dipakai Root.tsx
+const finalPath = path.join(publicDir, "voiceover.mp3");
+fs.renameSync(audioFilePath, finalPath);
 
-// CATATAN: API package `msedge-tts` bisa berubah antar versi.
-// Kalau method di atas error setelah `npm install`, cek dokumentasi
-// terbaru packagenya dan sesuaikan pemanggilannya di sini.
+console.log(`Voiceover tersimpan di: ${finalPath}`);
