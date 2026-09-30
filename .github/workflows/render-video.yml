@@ -1,13 +1,17 @@
 # ============================================================================
 # STICKY NOTE / README
 # Owned By     : <isi nama/tim kamu>
-# Last Updated : 2026-09-26
-# Description  : Render 1 video affiliate produk per trigger dari n8n
-#                (judul, harga, gambar, naskah voiceover), lalu kirim
-#                hasil videonya ke Telegram.
+# Last Updated : 2026-09-28
+# Description  : Render 1 video affiliate produk per trigger dari n8n.
+#                Video multi-scene: tiap scene punya foto, kalimat voiceover,
+#                dan caption sendiri, lalu hasilnya dikirim ke Telegram.
 # Flow         : Trigger (n8n via API) -> BuildRenderProps ->
-#                GenerateVoiceover -> RenderRemotionVideo ->
+#                GenerateVoiceover (per scene) -> RenderRemotionVideo ->
 #                SendVideoToTelegram -> (kalau gagal) ErrorHandlerGlobal
+# Input        : product_title, product_price, plus salah satu dari:
+#                - scenes_json + product_image_urls (mode multi-scene)
+#                - script_text + product_image_url  (mode sederhana; naskah
+#                  otomatis dipecah per kalimat jadi scene)
 # Dependencies : Secrets TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID
 #                (Settings -> Secrets and variables -> Actions)
 # ============================================================================
@@ -24,24 +28,36 @@ on:
       product_price:
         description: "Harga produk (contoh: Rp 149.000)"
         required: true
+      product_image_urls:
+        description: "URL foto produk, pisahkan dengan koma (mode multi-scene)"
+        required: false
+      scenes_json:
+        description: 'JSON scene, contoh: [{"photo":1,"text":"Halo","role":"hook"}]'
+        required: false
       product_image_url:
-        description: "URL gambar produk"
-        required: true
+        description: "URL 1 foto produk (mode sederhana)"
+        required: false
       script_text:
-        description: "Naskah voiceover / storyboard"
-        required: true
+        description: "Naskah utuh (mode sederhana, dipecah per kalimat)"
+        required: false
+      bgm_url:
+        description: "URL file MP3 musik latar royalty-free (opsional)"
+        required: false
 
 env:
   PRODUCT_TITLE: ${{ github.event.client_payload.product_title || github.event.inputs.product_title }}
   PRODUCT_PRICE: ${{ github.event.client_payload.product_price || github.event.inputs.product_price }}
+  PRODUCT_IMAGE_URLS: ${{ github.event.client_payload.product_image_urls || github.event.inputs.product_image_urls }}
+  SCENES_JSON: ${{ github.event.client_payload.scenes_json || github.event.inputs.scenes_json }}
   PRODUCT_IMAGE_URL: ${{ github.event.client_payload.product_image_url || github.event.inputs.product_image_url }}
   SCRIPT_TEXT: ${{ github.event.client_payload.script_text || github.event.inputs.script_text }}
+  BGM_URL: ${{ github.event.client_payload.bgm_url || github.event.inputs.bgm_url }}
 
 jobs:
   RenderVideo:
     name: RenderVideo
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: remotion
@@ -67,7 +83,7 @@ jobs:
         uses: nick-fields/retry@v3
         with:
           max_attempts: 3
-          timeout_minutes: 5
+          timeout_minutes: 8
           retry_wait_seconds: 1
           command: cd remotion && npm run generate-voiceover
 
@@ -80,6 +96,7 @@ jobs:
           echo "### Render selesai" >> "$GITHUB_STEP_SUMMARY"
           echo "- Produk: ${PRODUCT_TITLE}" >> "$GITHUB_STEP_SUMMARY"
           echo "- Harga : ${PRODUCT_PRICE}" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Jumlah scene: $(node -e "console.log(JSON.parse(require('fs').readFileSync('props.json','utf8')).scenes.length)")" >> "$GITHUB_STEP_SUMMARY"
 
       - name: SendVideoToTelegram
         uses: nick-fields/retry@v3

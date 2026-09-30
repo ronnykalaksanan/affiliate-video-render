@@ -1,5 +1,10 @@
 remotion/node_modules/
 remotion/out/
+remotion/props.json
+remotion/public/photo-*.jpg
+remotion/public/photo-*.png
+remotion/public/photo-*.webp
+remotion/public/vo-*.mp3
+remotion/public/bgm.mp3
 remotion/public/product.jpg
 remotion/public/voiceover.mp3
-remotion/props.json
