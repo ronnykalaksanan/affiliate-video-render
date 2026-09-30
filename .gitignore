@@ -6,5 +6,8 @@ remotion/public/photo-*.png
 remotion/public/photo-*.webp
 remotion/public/vo-*.mp3
 remotion/public/bgm.mp3
+remotion/public/bgm.wav
+remotion/public/bgm.ogg
+remotion/public/bgm.m4a
 remotion/public/product.jpg
 remotion/public/voiceover.mp3

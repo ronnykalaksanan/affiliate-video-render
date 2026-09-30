@@ -37,14 +37,21 @@ dan `script_text` (naskah utuh). Naskah otomatis dipecah per kalimat, tiap kalim
 
 ## Musik latar (opsional)
 
-Isi `BGM_URL` dengan direct-link file MP3 royalty-free (untuk dipakai lewat GitHub
+Isi `BGM_URL` dengan direct-link file audio royalty-free (untuk dipakai lewat GitHub
 Actions/n8n) ATAU path lokal relatif ke file di komputer kamu (berguna untuk testing
-sebelum file di-push, misal `assets/bgm-source.mp3` kalau kamu taruh filenya di
+sebelum file di-push, misal `public/assets/bgm-source.mp3` kalau kamu taruh filenya di
 `remotion/public/assets/`). Kalau dikosongkan, video tetap jalan normal tanpa musik latar.
+Ekstensi file (mp3/wav/ogg/m4a) terdeteksi otomatis dari file aslinya.
+
+**Rekomendasi: pakai format WAV** kalau MP3 dari situs musik gratis gagal diputar saat
+render (error "Could not play audio", biasanya karena metadata/encoding MP3 yang tidak
+sepenuhnya standar untuk browser headless). WAV jauh lebih toleran karena formatnya
+tidak terkompresi, walau ukuran filenya lebih besar dari MP3 (untuk kebutuhan render
+1x/hari ini tidak masalah).
 
 Sumber musik gratis yang aman dipakai (bukan lagu berhak cipta, supaya video tidak
 kena mute/takedown otomatis): **Pixabay Music**, **YouTube Audio Library**, atau
-**Mixkit**. Pastikan link yang dipakai adalah link download file MP3 langsung, bukan
+**Mixkit**. Pastikan link yang dipakai adalah link download file langsung, bukan
 link halaman preview.
 
 ## Test manual di lokal (PowerShell, dari folder `remotion`)

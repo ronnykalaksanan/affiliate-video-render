@@ -52,6 +52,20 @@ function extFromContentType(contentType) {
   return "jpg";
 }
 
+function audioExtFromContentType(contentType) {
+  if (!contentType) return null;
+  if (contentType.includes("wav")) return "wav";
+  if (contentType.includes("mpeg") || contentType.includes("mp3")) return "mp3";
+  if (contentType.includes("ogg")) return "ogg";
+  if (contentType.includes("mp4") || contentType.includes("m4a") || contentType.includes("aac")) return "m4a";
+  return null;
+}
+
+function audioExtFromPath(p) {
+  const ext = path.extname(p).replace(".", "").toLowerCase();
+  return ext || null;
+}
+
 function splitSentences(text) {
   const sentences = text
     .split(/(?<=[.!?])\s+/)
@@ -147,9 +161,13 @@ const scenes = buildScenes(photoPaths.length).map((scene, i) => ({
 let bgmPath;
 if (BGM_URL && BGM_URL.trim()) {
   const bgmSource = BGM_URL.trim();
-  bgmPath = "bgm.mp3";
   if (/^https?:\/\//i.test(bgmSource)) {
     const res = await fetchWithRetry(bgmSource);
+    const ext =
+      audioExtFromContentType(res.headers.get("content-type")) ||
+      audioExtFromPath(new URL(bgmSource).pathname) ||
+      "mp3";
+    bgmPath = `bgm.${ext}`;
     fs.writeFileSync(path.join(publicDir, bgmPath), Buffer.from(await res.arrayBuffer()));
   } else {
     // Bukan URL http(s) -> dianggap path lokal (berguna untuk testing sebelum di-push)
@@ -157,6 +175,8 @@ if (BGM_URL && BGM_URL.trim()) {
     if (!fs.existsSync(localPath)) {
       throw new Error(`File BGM lokal tidak ditemukan: ${localPath}`);
     }
+    const ext = audioExtFromPath(localPath) || "mp3";
+    bgmPath = `bgm.${ext}`;
     fs.copyFileSync(localPath, path.join(publicDir, bgmPath));
   }
   console.log(`Musik latar tersimpan: ${bgmPath}`);
